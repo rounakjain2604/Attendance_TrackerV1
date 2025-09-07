@@ -1,16 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useTheme } from 'next-themes';
-import { useToast } from '@/hooks/use-toast';
 import { toast } from 'sonner';
-import { Skeleton } from '@/components/ui/skeleton';
 
 interface Subject {
   id: number;
@@ -32,12 +30,8 @@ interface ScheduleItem {
 
 export default function AttendanceTracker() {
   const { theme, setTheme } = useTheme();
-  const { toast: uiToast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [originalSubjects, setOriginalSubjects] = useState<Subject[]>([]);
   const [activeTab, setActiveTab] = useState('attendance');
   
   const [schedule] = useState<ScheduleItem[]>([
@@ -97,63 +91,70 @@ export default function AttendanceTracker() {
     }
   ]);
 
-  // Simulate loading data
+  // Load data from localStorage on startup
   useEffect(() => {
-    const loadData = async () => {
+    const loadData = () => {
       try {
         setIsLoading(true);
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
         
-        const initialSubjects: Subject[] = [
-          {
-            id: 1,
-            name: 'Corporate Accounting',
-            attended: 17,
-            delivered: 29,
-            examDate: '18 September 2025 (Thursday)'
-          },
-          {
-            id: 2,
-            name: 'Financial Markets & Banking',
-            attended: 21,
-            delivered: 33,
-            examDate: '19 September 2025 (Friday)'
-          },
-          {
-            id: 3,
-            name: 'FinTech',
-            attended: 18,
-            delivered: 25,
-            examDate: '13 September 2025 (Saturday)'
-          },
-          {
-            id: 4,
-            name: 'Fundamentals of Financial Management',
-            attended: 29,
-            delivered: 41,
-            examDate: '16 September 2025 (Tuesday)'
-          },
-          {
-            id: 5,
-            name: 'Human Resource Management',
-            attended: 20,
-            delivered: 29,
-            examDate: '15 September 2025 (Monday)'
-          },
-          {
-            id: 6,
-            name: 'Principles of Marketing',
-            attended: 28,
-            delivered: 38,
-            examDate: '17 September 2025 (Wednesday)'
-          }
-        ];
+        // Try to get saved data from localStorage
+        const savedData = localStorage.getItem('attendanceData');
         
-        setSubjects(initialSubjects);
-        setOriginalSubjects(JSON.parse(JSON.stringify(initialSubjects)));
-      } catch (err) {
-        setError('Failed to load attendance data');
+        if (savedData) {
+          // Load saved data
+          setSubjects(JSON.parse(savedData));
+        } else {
+          // Use default data if nothing saved
+          const defaultSubjects: Subject[] = [
+            {
+              id: 1,
+              name: 'Corporate Accounting',
+              attended: 17,
+              delivered: 29,
+              examDate: '18 September 2025 (Thursday)'
+            },
+            {
+              id: 2,
+              name: 'Financial Markets & Banking',
+              attended: 21,
+              delivered: 33,
+              examDate: '19 September 2025 (Friday)'
+            },
+            {
+              id: 3,
+              name: 'FinTech',
+              attended: 18,
+              delivered: 25,
+              examDate: '13 September 2025 (Saturday)'
+            },
+            {
+              id: 4,
+              name: 'Fundamentals of Financial Management',
+              attended: 29,
+              delivered: 41,
+              examDate: '16 September 2025 (Tuesday)'
+            },
+            {
+              id: 5,
+              name: 'Human Resource Management',
+              attended: 20,
+              delivered: 29,
+              examDate: '15 September 2025 (Monday)'
+            },
+            {
+              id: 6,
+              name: 'Principles of Marketing',
+              attended: 28,
+              delivered: 38,
+              examDate: '17 September 2025 (Wednesday)'
+            }
+          ];
+          setSubjects(defaultSubjects);
+          // Save default data to localStorage
+          localStorage.setItem('attendanceData', JSON.stringify(defaultSubjects));
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
         toast.error('Failed to load attendance data');
       } finally {
         setIsLoading(false);
@@ -163,14 +164,20 @@ export default function AttendanceTracker() {
     loadData();
   }, []);
 
+  // Save data to localStorage whenever subjects change
+  useEffect(() => {
+    if (subjects.length > 0 && !isLoading) {
+      try {
+        localStorage.setItem('attendanceData', JSON.stringify(subjects));
+      } catch (error) {
+        console.error('Error saving data:', error);
+        toast.error('Failed to save attendance data');
+      }
+    }
+  }, [subjects, isLoading]);
+
   const calculatePercentage = (attended: number, delivered: number): number => {
     return delivered === 0 ? 0 : parseFloat(((attended / delivered) * 100).toFixed(1));
-  };
-
-  const getProgressBarColor = (percentage: number): string => {
-    if (percentage >= 75) return 'bg-green-500';
-    if (percentage >= 60) return 'bg-yellow-500';
-    return 'bg-red-500';
   };
 
   const getPercentageTextColor = (percentage: number): string => {
@@ -189,9 +196,6 @@ export default function AttendanceTracker() {
     const targetPercentage = 75;
     if (delivered === 0) return 0;
     
-    // Calculate how many more classes needed to reach 75%
-    // Formula: (attended + x) / (delivered + x) = 0.75
-    // Solving for x: x = (0.75 * delivered - attended) / 0.25
     const needed = Math.ceil((0.75 * delivered - attended) / 0.25);
     return needed > 0 ? needed : 0;
   };
@@ -225,7 +229,53 @@ export default function AttendanceTracker() {
   };
 
   const resetAttendance = () => {
-    setSubjects(JSON.parse(JSON.stringify(originalSubjects)));
+    const defaultSubjects: Subject[] = [
+      {
+        id: 1,
+        name: 'Corporate Accounting',
+        attended: 17,
+        delivered: 29,
+        examDate: '18 September 2025 (Thursday)'
+      },
+      {
+        id: 2,
+        name: 'Financial Markets & Banking',
+        attended: 21,
+        delivered: 33,
+        examDate: '19 September 2025 (Friday)'
+      },
+      {
+        id: 3,
+        name: 'FinTech',
+        attended: 18,
+        delivered: 25,
+        examDate: '13 September 2025 (Saturday)'
+      },
+      {
+        id: 4,
+        name: 'Fundamentals of Financial Management',
+        attended: 29,
+        delivered: 41,
+        examDate: '16 September 2025 (Tuesday)'
+      },
+      {
+        id: 5,
+        name: 'Human Resource Management',
+        attended: 20,
+        delivered: 29,
+        examDate: '15 September 2025 (Monday)'
+      },
+      {
+        id: 6,
+        name: 'Principles of Marketing',
+        attended: 28,
+        delivered: 38,
+        examDate: '17 September 2025 (Wednesday)'
+      }
+    ];
+    
+    setSubjects(defaultSubjects);
+    localStorage.setItem('attendanceData', JSON.stringify(defaultSubjects));
     toast.info('Attendance reset to original values');
   };
 
@@ -245,35 +295,11 @@ export default function AttendanceTracker() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background p-4">
-        <div className="container mx-auto">
-          <div className="space-y-8">
-            <Skeleton className="h-32 w-full" />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(6)].map((_, i) => (
-                <Skeleton key={i} className="h-64" />
-              ))}
-            </div>
-          </div>
+      <div className="min-h-screen bg-background p-4 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-lg">Loading your attendance data...</p>
         </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-destructive">Error</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="mb-4">{error}</p>
-            <Button onClick={() => window.location.reload()} className="w-full">
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
       </div>
     );
   }
@@ -291,6 +317,7 @@ export default function AttendanceTracker() {
               <p className="text-muted-foreground text-base md:text-lg">
                 Track your attendance and plan ahead for academic success
               </p>
+              <p className="text-xs text-green-600 mt-1">💾 Your data is automatically saved!</p>
             </div>
             <div className="flex items-center space-x-4 mt-4 md:mt-0">
               <Button
@@ -543,7 +570,7 @@ export default function AttendanceTracker() {
                 Attendance Tracker App © {new Date().getFullYear()}
               </p>
               <p className="text-muted-foreground text-sm md:text-base mt-2">
-                Stay on top of your attendance goals!
+                💾 Your data is automatically saved in your browser
               </p>
             </CardContent>
           </Card>
